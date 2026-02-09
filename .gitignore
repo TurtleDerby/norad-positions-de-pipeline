@@ -1,1 +1,18 @@
 .aws/
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Terraform variable and plan files (often contain secrets)
+*.tfvars
+*.tfvars.json
+*.auto.tfvars
+*.tfplan
+
+# Common local secret files
+.env
+*.pem
+*.key
