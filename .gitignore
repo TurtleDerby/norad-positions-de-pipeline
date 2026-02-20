@@ -1,6 +1,8 @@
+# AWS credentials
 .aws/
+
 # Terraform
-.terraform/
+**/.terraform/*
 *.tfstate
 *.tfstate.*
 crash.log
@@ -16,3 +18,14 @@ crash.*.log
 .env
 *.pem
 *.key
+
+# Python virtual environment
+**/.venv/*
+**/__pycache__/
+*.pyc
+
+# Lambda build artifact
+ingest/lambda/deployment.zip
+
+# OS noise
+.DS_Store

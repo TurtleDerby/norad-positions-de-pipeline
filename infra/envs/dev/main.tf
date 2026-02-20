@@ -89,3 +89,87 @@ output "athena_workgroup" {
 output "glue_database" {
     value = aws_glue_catalog_database.norad.name
 }
+
+
+# -----------------------------------------------------------------
+# IAM Role for Lambda functions with necessary permissions
+# -----------------------------------------------------------------
+resource "aws_iam_role" "lambda_role" {
+  name = "${local.project}-${local.environment}-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      { # Allow Lambda service to assume this role
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+# -----------------------------------------------------------------
+# Attach AWSLambdaBasicExecutionRole policy to the Lambda role created above
+# -----------------------------------------------------------------
+resource "aws_iam_role_policy_attachment" "lambda_basic_logs" {
+  role = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# -----------------------------------------------------------------
+# Create custom IAM policy for IAM functions to access S3 and Secrets Manager, and attach it to the Lambda role
+# -----------------------------------------------------------------
+resource "aws_iam_policy" "lambda_policy" {
+    name = "${local.project}-${local.environment}-lambda-policy"
+
+    policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+        {
+            Effect = "Allow"
+            Action = [
+                "s3:PutObject"
+            ]
+            Resource = "${aws_s3_bucket.data_lake.arn}/*"
+        },
+        {
+            Effect = "Allow"
+            Action = [
+                "secretsmanager:GetSecretValue",
+            ]
+            Resource = "*"
+        }
+    ]
+    })
+}
+
+# -----------------------------------------------------------------
+# Attach the custom IAM policy to the Lambda role
+# -----------------------------------------------------------------
+resource "aws_iam_role_policy_attachment" "lambda_attach_custom" {
+    role = aws_iam_role.lambda_role.name
+    policy_arn = aws_iam_policy.lambda_policy.arn
+}
+
+# -----------------------------------------------------------------
+# Lambda function for ingesting positions data into the data lake
+# -----------------------------------------------------------------
+resource "aws_lambda_function" "ingest_positions" {
+    function_name = "${local.project}-${local.environment}-ingest"
+    role = aws_iam_role.lambda_role.arn
+    handler = "app.handler"
+    runtime = "python3.11"
+    timeout = 30
+
+    filename = "${path.module}/../../../ingest/lambda/deployment.zip"
+    source_code_hash = filebase64sha256("${path.module}/../../../ingest/lambda/deployment.zip")
+
+    environment {
+      variables = {
+        DATA_LAKE_BUCKET = aws_s3_bucket.data_lake.bucket
+      }
+    }
+}
